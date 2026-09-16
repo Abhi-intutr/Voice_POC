@@ -49,10 +49,10 @@ public class StorageService {
     }
 
     /** Saves generated WAV bytes under a fresh id and returns that id. */
-    public String saveGeneratedAudio(byte[] wavBytes) throws IOException {
+    public String saveGeneratedAudio(byte[] audioBytes) throws IOException {
         String id = UUID.randomUUID().toString();
-        Path target = generatedDir.resolve(id + ".wav");
-        Files.write(target, wavBytes);
+        Path target = generatedDir.resolve(id + ".mp3");
+        Files.write(target, audioBytes);
         return id;
     }
 
@@ -62,7 +62,7 @@ public class StorageService {
         if (id == null || !id.matches("[a-fA-F0-9-]{36}")) {
             throw new AudioNotFoundException(id);
         }
-        Path candidate = generatedDir.resolve(id + ".wav").normalize();
+        Path candidate = generatedDir.resolve(id + ".mp3").normalize();
         if (!candidate.startsWith(generatedDir) || !Files.exists(candidate)) {
             throw new AudioNotFoundException(id);
         }
@@ -71,9 +71,9 @@ public class StorageService {
 
     private String extensionOf(String filename) {
         if (filename == null) {
-            return ".wav";
+            return ".mp3";
         }
         int dot = filename.lastIndexOf('.');
-        return dot >= 0 ? filename.substring(dot).toLowerCase() : ".wav";
+        return dot >= 0 ? filename.substring(dot).toLowerCase() : ".mp3";
     }
 }

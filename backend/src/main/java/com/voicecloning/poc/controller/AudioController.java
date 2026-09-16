@@ -37,8 +37,8 @@ public class AudioController {
         }
 
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("audio/wav"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + id + ".wav\"")
+                .contentType(MediaType.parseMediaType("audio/mpeg"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + id + ".mp3\"")
                 .contentLength(contentLength)
                 .body(resource);
     }

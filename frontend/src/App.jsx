@@ -233,8 +233,8 @@ export default function App() {
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <audio controls src={audioUrl} />
             <div className="output-actions">
-              <a href={audioUrl} download="generated.wav">
-                Download WAV
+              <a href={audioUrl} download="generated.mp3">
+                Download MP3
               </a>
             </div>
           </div>
