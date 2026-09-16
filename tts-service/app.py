@@ -29,11 +29,11 @@ import traceback
 from flask import Flask, request, jsonify, send_file, after_this_request
 
 # --- Configuration (override via environment variables) --------------------
-# 0.6B is the smallest Qwen3-TTS variant and the one requested for this POC.
+# 1.7B is the larger Qwen3-TTS variant for higher quality voice cloning output.
 # "Base" is the variant whose generate() method accepts ref_audio/ref_text,
 # i.e. the actual voice-cloning path (CustomVoice/VoiceDesign use different
 # methods and predefined speakers instead of a reference clip).
-MODEL_ID = os.environ.get("TTS_MODEL_ID", "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16")
+MODEL_ID = os.environ.get("TTS_MODEL_ID", "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16")
 HOST = os.environ.get("TTS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("TTS_PORT", "8000"))
 MAX_TEXT_LENGTH = int(os.environ.get("TTS_MAX_TEXT_LENGTH", "2000"))
