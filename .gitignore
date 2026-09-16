@@ -1,0 +1,40 @@
+# --- Never commit audio or model files ---
+voices/*
+!voices/.gitkeep
+generated/*
+!generated/.gitkeep
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+
+# --- Backend (Java / Maven) ---
+backend/target/
+backend/*.log
+*.class
+
+# --- TTS service (Python) ---
+tts-service/.venv/
+tts-service/venv/
+tts-service/__pycache__/
+**/__pycache__/
+*.pyc
+tts-service/*.log
+
+# Model weights get cached by huggingface_hub outside the repo
+# (~/.cache/huggingface), but ignore any that end up local anyway.
+tts-service/models/
+tts-service/*.safetensors
+
+# --- Frontend (Node / Vite) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# --- OS / editor ---
+.DS_Store
+.idea/
+.vscode/
+*.iml

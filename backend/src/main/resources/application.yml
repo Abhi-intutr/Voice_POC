@@ -1,0 +1,40 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: voice-cloning-poc-backend
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+app:
+  storage:
+    # Paths are relative to the directory the backend is started from
+    # (the README starts it from backend/, so these resolve to the
+    # voices/ and generated/ folders at the project root).
+    upload-dir: ../voices
+    generated-dir: ../generated
+  tts:
+    base-url: http://127.0.0.1:8000
+    timeout-seconds: 180
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://localhost:3000
+  upload:
+    max-audio-bytes: 20971520      # 20 MB
+    allowed-audio-extensions:
+      - wav
+      - mp3
+      - m4a
+      - flac
+      - ogg
+    max-text-length: 2000
+    max-reference-text-length: 4000
+
+logging:
+  level:
+    com.voicecloning.poc: INFO

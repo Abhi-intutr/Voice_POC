@@ -1,0 +1,8 @@
+# Apple Silicon (M1/M2/M3/M4) only — mlx does not install on Linux/Windows/Intel Mac.
+# Tested against: Python 3.11, macOS 14+, arm64.
+
+mlx-audio>=0.2.0        # Apple MLX TTS/STT/STS library (pulls in mlx + mlx-lm as deps)
+flask>=3.0.0            # tiny HTTP server for the /tts and /health endpoints
+soundfile>=0.12.1       # WAV encode/decode (libsndfile-based)
+numpy>=1.26.0
+librosa>=0.10.2         # used by mlx-audio to load non-WAV reference audio (mp3/m4a)
