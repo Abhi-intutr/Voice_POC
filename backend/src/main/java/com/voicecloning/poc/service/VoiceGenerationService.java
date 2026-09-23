@@ -2,6 +2,7 @@ package com.voicecloning.poc.service;
 
 import com.voicecloning.poc.client.TtsServiceClient;
 import com.voicecloning.poc.config.AppProperties;
+import com.voicecloning.poc.dto.CustomVoiceRequest;
 import com.voicecloning.poc.exception.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +58,35 @@ public class VoiceGenerationService {
             throw new ValidationException("Failed to store generated audio: " + e.getMessage());
         }
     }
+
+    public String generateCustom(CustomVoiceRequest request) {
+        if (request == null || request.text() == null || request.text().isBlank()) {
+            throw new ValidationException("text is required.");
+        }
+        if (request.text().length() > uploadRules.maxTextLength()) {
+            throw new ValidationException(
+                    "text exceeds the maximum length of " + uploadRules.maxTextLength() + " characters.");
+        }
+
+        log.info("Requesting custom voice generation (speaker: {}, {} chars of text)",
+                request.speaker(), request.text().length());
+
+        byte[] generatedMp3 = ttsServiceClient.generateCustomVoice(
+                request.text().trim(),
+                request.speaker(),
+                request.language(),
+                request.instruct()
+        );
+
+        try {
+            String id = storageService.saveGeneratedAudio(generatedMp3);
+            log.info("Stored generated custom audio as {}", id);
+            return id;
+        } catch (IOException e) {
+            throw new ValidationException("Failed to store generated audio: " + e.getMessage());
+        }
+    }
+
 
     private void validate(MultipartFile referenceAudio, String referenceText, String text) {
         if (referenceAudio == null || referenceAudio.isEmpty()) {

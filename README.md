@@ -5,16 +5,22 @@ A local, three-part proof of concept:
 ```
 React (frontend)  --http-->  Spring Boot (backend)  --http-->  Flask (tts-service)
    :5173                          :8080                              :8000
-                                                                (MLX + Qwen3-TTS 0.6B,
-                                                                 Apple Silicon only)
+                                                            Two MLX Qwen3-TTS 1.7B models:
+                                                             • Base         — voice cloning
+                                                             • CustomVoice  — preset speakers
+                                                            (Apple Silicon only)
 ```
 
 1. **frontend/** — upload a reference clip, type its transcript, type new text, hit generate.
 2. **backend/** — Java 21 / Spring Boot. Validates input, stores files, forwards the
    request to the TTS service, stores the result, serves it back.
 3. **tts-service/** — Python, runs [MLX-Audio](https://github.com/Blaizzy/mlx-audio)'s
-   Qwen3-TTS 0.6B model natively on Apple Silicon (Metal, no CUDA) to actually clone
-   the voice.
+   Qwen3-TTS **1.7B** models natively on Apple Silicon (Metal, no CUDA):
+   - **Base model** (`Qwen3-TTS-12Hz-1.7B-Base-bf16`) — clones any voice from a reference
+     audio clip via the `POST /tts` endpoint.
+   - **CustomVoice model** (`Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16`) — generates speech
+     using built-in preset speakers (Vivian, Aiden, Dylan, Eric, Serena …) with
+     style/emotion control via the `POST /tts-custom` endpoint.
 
 No database, no auth, no Docker — everything is local files, on purpose, for a POC.
 
@@ -79,20 +85,32 @@ Start it:
 python app.py
 ```
 
-**What to expect:** the first start downloads `mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16`
-from Hugging Face — roughly **1–1.5 GB** on disk, into `~/.cache/huggingface`. Loaded
-in memory it uses roughly **1.5–2 GB RAM**, which is comfortable on an 8 GB machine as
-long as you're not simultaneously running another large model. Subsequent starts skip
-the download and load from the local cache in a few seconds.
+**What to expect on first start:** the service eagerly loads the **Base model**
+(`mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16`) on startup — roughly **1.2–1.5 GB**
+downloaded into `~/.cache/huggingface`. In memory it uses roughly **1.5–2 GB RAM**.
+Subsequent starts skip the download and load from the local cache in a few seconds.
+
+The **CustomVoice model** (`mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16`) is
+loaded **lazily** — only when the first `/tts-custom` request arrives. That's another
+~1.2 GB download (once) and ~1.5 GB RAM. On an 8 GB machine both can coexist, but
+calling one endpoint at a time avoids memory pressure.
 
 Leave this running in its own terminal. Check it's healthy:
 
 ```bash
 curl http://127.0.0.1:8000/health
-# {"status": "ready", "model": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16"}
+# {
+#   "status": "ready",
+#   "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+#   "custom_voice_status": "not_loaded",
+#   "custom_voice_model": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16"
+# }
 ```
 
-If `status` is `"loading"`, wait and retry — the model is still downloading/loading.
+`custom_voice_status` will be `not_loaded` until the first `/tts-custom` call, then
+`ready` (or `error` with a message if something went wrong loading it).
+
+If `status` is `"loading"`, wait and retry — the Base model is still downloading/loading.
 If it's `"error"`, the message will say why (usually: not on Apple Silicon, or mlx-audio
 isn't installed correctly).
 
@@ -165,6 +183,8 @@ an M1) → play or download the result.
 
 ### Testing the backend directly with curl
 
+#### Voice cloning (`/tts` — Base model)
+
 ```bash
 # 1. Kick off generation
 curl -X POST http://localhost:8080/api/voice/generate \
@@ -175,11 +195,42 @@ curl -X POST http://localhost:8080/api/voice/generate \
 # -> {"success":true,"audioUrl":"/api/audio/<uuid>"}
 
 # 2. Fetch the generated file
-curl http://localhost:8080/api/audio/<uuid> -o generated.wav
+curl http://localhost:8080/api/audio/<uuid> -o generated.mp3
 
 # 3. Health check
 curl http://localhost:8080/api/health
 ```
+
+#### Preset speaker TTS (`/tts-custom` — CustomVoice model)
+
+No reference audio needed — just pick a speaker and optionally add a style hint:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/tts-custom \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello! Welcome to the voice cloning POC.", "speaker": "Vivian", "instruct": "Warm and friendly."}' \
+  --output vivian.mp3
+```
+
+**Available fields:**
+
+| Field | Required | Default | Description |
+|---|---|---|---|
+| `text` | ✅ | — | Text to synthesize |
+| `speaker` | ❌ | `Vivian` | Preset speaker name |
+| `language` | ❌ | `English` | Target language |
+| `instruct` | ❌ | _(none)_ | Style/emotion hint, e.g. `"Very excited!"` |
+
+**Common built-in speakers:** Vivian, Aiden, Dylan, Eric, Serena
+
+To discover all speakers supported by the loaded model:
+
+```bash
+python3 -c "
+from mlx_audio.tts.utils import load_model
+m = load_model('mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16')
+print(m.get_supported_speakers())
+"
 
 ## Configuration reference
 
@@ -197,7 +248,18 @@ All backend config lives in `backend/src/main/resources/application.yml`
 | `app.upload.allowed-audio-extensions` | wav, mp3, m4a, flac, ogg | accepted formats |
 | `app.upload.max-text-length` | `2000` | max chars for generation text |
 
-tts-service config is via environment variables — see `tts-service/README.md`.
+tts-service config is via environment variables:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TTS_MODEL_ID` | `mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16` | Base (voice-cloning) model |
+| `TTS_CUSTOM_VOICE_MODEL_ID` | `mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16` | CustomVoice model |
+| `TTS_HOST` | `127.0.0.1` | bind address |
+| `TTS_PORT` | `8000` | listen port |
+| `TTS_MAX_TEXT_LENGTH` | `2000` | max chars per request |
+| `TTS_MAX_UPLOAD_BYTES` | `26214400` (25 MB) | max reference audio upload |
+
+Full details: [`tts-service/README.md`](tts-service/README.md).
 
 ## Known limitations (by design, for a POC)
 

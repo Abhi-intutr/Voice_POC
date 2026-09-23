@@ -106,8 +106,15 @@ function ReferenceDropzone({ file, onFile }) {
   );
 }
 
+const SPEAKERS = ["Vivian", "Aiden", "Dylan", "Eric", "Serena"];
+
 export default function App() {
   const health = useHealthStatus();
+
+  const [mode, setMode] = useState("clone"); // "clone" | "custom"
+  const [speaker, setSpeaker] = useState("Vivian");
+  const [stylePrompt, setStylePrompt] = useState("");
+  const [emotionPrompt, setEmotionPrompt] = useState("");
 
   const [referenceFile, setReferenceFile] = useState(null);
   const [referenceText, setReferenceText] = useState("");
@@ -118,7 +125,10 @@ export default function App() {
   const [audioUrl, setAudioUrl] = useState(null);
 
   const canSubmit =
-    referenceFile && referenceText.trim() && text.trim() && status !== "generating";
+    status !== "generating" &&
+    (mode === "clone"
+      ? referenceFile && referenceText.trim() && text.trim()
+      : text.trim());
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -128,16 +138,35 @@ export default function App() {
     setError(null);
     setAudioUrl(null);
 
-    const form = new FormData();
-    form.append("referenceAudio", referenceFile);
-    form.append("referenceText", referenceText.trim());
-    form.append("text", text.trim());
-
     try {
-      const res = await fetch(`${API_BASE_URL}/api/voice/generate`, {
-        method: "POST",
-        body: form,
-      });
+      let res;
+      if (mode === "clone") {
+        const form = new FormData();
+        form.append("referenceAudio", referenceFile);
+        form.append("referenceText", referenceText.trim());
+        form.append("text", text.trim());
+
+        res = await fetch(`${API_BASE_URL}/api/voice/generate`, {
+          method: "POST",
+          body: form,
+        });
+      } else {
+        const combinedInstruct = [stylePrompt.trim(), emotionPrompt.trim()]
+          .filter(Boolean)
+          .join(". ");
+
+        res = await fetch(`${API_BASE_URL}/api/voice/generate-custom`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: text.trim(),
+            speaker,
+            language: "English",
+            instruct: combinedInstruct,
+          }),
+        });
+      }
+
       const body = await res.json().catch(() => ({}));
 
       if (!res.ok || !body.success) {
@@ -153,7 +182,7 @@ export default function App() {
   }
 
   function fillSampleText() {
-    if (!referenceText.trim()) setReferenceText(SAMPLE_REFERENCE_TEXT);
+    if (mode === "clone" && !referenceText.trim()) setReferenceText(SAMPLE_REFERENCE_TEXT);
     if (!text.trim()) setText(SAMPLE_GENERATION_TEXT);
   }
 
@@ -167,47 +196,138 @@ export default function App() {
           <StatusPill health={health} />
         </div>
         <p className="tagline">
-          Upload a short reference recording, tell it what that recording says, then type
-          anything else — it comes back read aloud in that voice.
+          {mode === "clone"
+            ? "Upload a short reference recording, tell it what that recording says, then type anything else — it comes back read aloud in that voice."
+            : "Select a preset speaker, configure style and emotion instructions, and type your text to generate speech."}
         </p>
 
-        <form onSubmit={handleSubmit}>
-          <div className="panel">
-            <h2>Reference recording</h2>
-            <p className="hint">A clean few-second clip of the voice to clone.</p>
-            <ReferenceDropzone file={referenceFile} onFile={setReferenceFile} />
-          </div>
+        <div className="mode-selector">
+          <button
+            type="button"
+            className={`mode-btn ${mode === "clone" ? "active" : ""}`}
+            onClick={() => {
+              setMode("clone");
+              setError(null);
+            }}
+          >
+            Voice Clone (Base 1.7B)
+          </button>
+          <button
+            type="button"
+            className={`mode-btn ${mode === "custom" ? "active" : ""}`}
+            onClick={() => {
+              setMode("custom");
+              setError(null);
+            }}
+          >
+            Preset Voices (CustomVoice 1.7B)
+          </button>
+        </div>
 
-          <div className="panel">
-            <h2>What that recording says</h2>
-            <p className="hint">
-              The exact transcript of the reference clip above, word for word.{" "}
-              <button
-                type="button"
-                onClick={fillSampleText}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--accent)",
-                  cursor: "pointer",
-                  padding: 0,
-                  font: "inherit",
-                }}
-              >
-                Use sample text
-              </button>
-            </p>
-            <textarea
-              rows={3}
-              value={referenceText}
-              onChange={(e) => setReferenceText(e.target.value.slice(0, 4000))}
-              placeholder={SAMPLE_REFERENCE_TEXT}
-            />
-          </div>
+        <form onSubmit={handleSubmit}>
+          {mode === "clone" ? (
+            <>
+              <div className="panel">
+                <h2>Reference recording</h2>
+                <p className="hint">A clean few-second clip of the voice to clone.</p>
+                <ReferenceDropzone file={referenceFile} onFile={setReferenceFile} />
+              </div>
+
+              <div className="panel">
+                <h2>What that recording says</h2>
+                <p className="hint">
+                  The exact transcript of the reference clip above, word for word.{" "}
+                  <button
+                    type="button"
+                    onClick={fillSampleText}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      padding: 0,
+                      font: "inherit",
+                    }}
+                  >
+                    Use sample text
+                  </button>
+                </p>
+                <textarea
+                  rows={3}
+                  value={referenceText}
+                  onChange={(e) => setReferenceText(e.target.value.slice(0, 4000))}
+                  placeholder={SAMPLE_REFERENCE_TEXT}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="panel">
+              <h2>Select Preset Speaker</h2>
+              <p className="hint">Choose a built-in voice preset and configure optional style and emotion options.</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 13, color: "var(--text-dim)", marginBottom: 6 }}>
+                    Speaker Voice
+                  </label>
+                  <select value={speaker} onChange={(e) => setSpeaker(e.target.value)}>
+                    {SPEAKERS.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 13, color: "var(--text-dim)", marginBottom: 6 }}>
+                    Style Instruction (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={stylePrompt}
+                    onChange={(e) => setStylePrompt(e.target.value)}
+                    placeholder='e.g. "Warm storytelling style", "Fast-paced news anchor", "Whispering tone"'
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 13, color: "var(--text-dim)", marginBottom: 6 }}>
+                    Emotion Instruction (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={emotionPrompt}
+                    onChange={(e) => setEmotionPrompt(e.target.value)}
+                    placeholder='e.g. "Cheerful and excited", "Calm and peaceful", "Serious and authoritative"'
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
 
           <div className="panel">
             <h2>Text to speak</h2>
-            <p className="hint">Whatever you want generated in the cloned voice.</p>
+            <p className="hint">
+              Whatever you want generated in the {mode === "clone" ? "cloned" : "selected"} voice.
+              {mode === "custom" && !text.trim() && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    onClick={fillSampleText}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      padding: 0,
+                      font: "inherit",
+                    }}
+                  >
+                    Use sample text
+                  </button>
+                </>
+              )}
+            </p>
             <textarea
               rows={5}
               value={text}
@@ -231,7 +351,7 @@ export default function App() {
           <div className="panel output-panel" style={{ marginTop: 16 }}>
             <h2>Generated audio</h2>
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <audio controls src={audioUrl} />
+            <audio controls src={audioUrl} autoPlay />
             <div className="output-actions">
               <a href={audioUrl} download="generated.mp3">
                 Download MP3
@@ -243,3 +363,4 @@ export default function App() {
     </div>
   );
 }
+

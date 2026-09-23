@@ -78,6 +78,36 @@ public class TtsServiceClient {
     }
 
     /**
+     * Calls POST /tts-custom on the Python service and returns the raw MP3 bytes.
+     */
+    public byte[] generateCustomVoice(String text, String speaker, String language, String instruct) {
+        Map<String, String> body = Map.of(
+                "text", text,
+                "speaker", speaker != null ? speaker : "Vivian",
+                "language", language != null ? language : "English",
+                "instruct", instruct != null ? instruct : ""
+        );
+
+        try {
+            return restClient.post()
+                    .uri("/tts-custom")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .body(byte[].class);
+        } catch (RestClientResponseException ex) {
+            String detail = extractErrorMessage(ex);
+            log.warn("tts-service returned {} for /tts-custom: {}", ex.getStatusCode(), detail);
+            throw new TtsServiceException("TTS service rejected the request: " + detail, false);
+        } catch (ResourceAccessException ex) {
+            throw new TtsServiceException(
+                    "Could not reach the TTS service at " + ttsProperties.baseUrl() +
+                            ". Is tts-service running? (" + ex.getMessage() + ")", ex, true);
+        }
+    }
+
+
+    /**
      * Calls GET /health on the Python service. Never throws - callers use the
      * returned status object to decide what to report.
      */

@@ -58,6 +58,43 @@
 .dot.error { background: var(--danger); }
 .dot.loading { background: #c9a94e; }
 
+.mode-selector {
+  display: flex;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 4px;
+  margin-bottom: 20px;
+  gap: 4px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mode-btn:hover {
+  color: var(--text);
+}
+
+.mode-btn.active {
+  background: var(--panel-raised);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -79,7 +116,7 @@
   margin: 0 0 14px;
 }
 
-textarea, input[type="text"] {
+textarea, input[type="text"], select {
   width: 100%;
   background: var(--panel-raised);
   border: 1px solid var(--line);
@@ -91,9 +128,11 @@ textarea, input[type="text"] {
   resize: vertical;
 }
 
-textarea:focus, input[type="text"]:focus {
+textarea:focus, input[type="text"]:focus, select:focus {
   border-color: var(--accent-dim);
+  outline: none;
 }
+
 
 .char-count {
   text-align: right;
